@@ -1,0 +1,10 @@
+[package]
+name = "ctflgrdiff"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "^4.0", features = [ "derive"] }
+llvm-ir = { version = "^0.8", features = ["llvm-14"] }
+tui = "^0.19"
+crossterm = "^0.25"
