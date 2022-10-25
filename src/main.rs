@@ -1,3 +1,4 @@
+mod goblin_yax;
 mod llvm;
 use std::{
     borrow::Cow,
@@ -42,7 +43,6 @@ enum FunctionName {
     Unspecified,
 }
 trait Program: Sized {
-    const EQUIVALENT: i32;
     const GAP: i32;
     type ParseError: Display;
     type Function: Function;
@@ -64,8 +64,19 @@ trait BasicBlock {
     fn terminator(&self) -> &Self::Terminator;
 }
 trait Instruction {
+    const EQUIVALENT: i32;
     fn score(&self, other: &Self) -> i32;
     fn render<'a>(&self) -> Cow<'a, str>;
+}
+impl Instruction for () {
+    const EQUIVALENT: i32 = 0;
+    fn score(&self, _other: &Self) -> i32 {
+        0
+    }
+
+    fn render<'a>(&self) -> Cow<'a, str> {
+        Cow::Borrowed("")
+    }
 }
 fn main() {
     let args = Args::parse();
@@ -85,6 +96,29 @@ fn main() {
         "ll-bc" | "llbc" => {
             show_diff::<llvm_ir::Module>(args.left_file, args.right_file, function_name)
         }
+        "arm64" | "aarch64" | "armv8" => show_diff::<
+            goblin_yax::GoblinYax<yaxpeax_arm::armv8::a64::ARMv8>,
+        >(args.left_file, args.right_file, function_name),
+        "arm32" | "aarch32" | "armv7" => show_diff::<
+            goblin_yax::GoblinYax<yaxpeax_arm::armv8::a64::ARMv8>,
+        >(args.left_file, args.right_file, function_name),
+        "avr" => show_diff::<goblin_yax::GoblinYax<yaxpeax_avr::AVR>>(
+            args.left_file,
+            args.right_file,
+            function_name,
+        ),
+        "x86" | "x86-32" | "x86_32" | "i386" | "i686" => {
+            show_diff::<goblin_yax::GoblinYax<yaxpeax_x86::x86_32>>(
+                args.left_file,
+                args.right_file,
+                function_name,
+            )
+        }
+        "x64" | "x86-64" | "x86_64" => show_diff::<goblin_yax::GoblinYax<yaxpeax_x86::x86_64>>(
+            args.left_file,
+            args.right_file,
+            function_name,
+        ),
         fmt => {
             eprintln!("Can't parse “{}” files. Sorry.", fmt);
             2
@@ -195,7 +229,9 @@ fn show_diff<P: Program>(
                                 let score = left_block.get(i).score(right_block.get(j));
                                 (
                                     grid[i][j].0 + score,
-                                    Some(MatchDirection::Align(score >= P::EQUIVALENT)),
+                                    Some(MatchDirection::Align(
+                                        score >= <<<P as Program>::Function as Function>::BasicBlock as BasicBlock>::Instruction::EQUIVALENT,
+                                    )),
                                 )
                             },
                             (grid[i + 1][j].0 - P::GAP, Some(MatchDirection::GapLeft)),
@@ -243,7 +279,7 @@ fn show_diff<P: Program>(
                     path.reverse();
                     best_block = Some((
                         score,
-                        terminator_score >= P::EQUIVALENT,
+                        terminator_score >= <<<P as Program>::Function as Function>::BasicBlock as BasicBlock>::Terminator::EQUIVALENT,
                         right_id,
                         right_block,
                         path,

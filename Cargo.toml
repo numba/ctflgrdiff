@@ -5,6 +5,14 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "^4.0", features = [ "derive"] }
-llvm-ir = { version = "^0.8", features = ["llvm-14"] }
-tui = "^0.19"
+cpp_demangle = "^0.4"
 crossterm = "^0.25"
+goblin = "^0.6"
+llvm-ir = { version = "^0.8", features = ["llvm-14"] }
+num-traits = "^0.2"
+rustc-demangle = "^0.1"
+tui = "^0.19"
+yaxpeax-arch = "^0.2"
+yaxpeax-arm = "^0.2"
+yaxpeax-avr = "^0.1"
+yaxpeax-x86 = "^1.1"

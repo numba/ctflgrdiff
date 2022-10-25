@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
 impl crate::Program for llvm_ir::Module {
-    const EQUIVALENT: i32 = 4;
     const GAP: i32 = 2;
 
     type ParseError = String;
@@ -56,6 +55,7 @@ impl crate::BasicBlock for llvm_ir::BasicBlock {
     }
 }
 impl crate::Instruction for llvm_ir::Instruction {
+    const EQUIVALENT: i32 = 4;
     fn score(&self, other: &Self) -> i32 {
         match (self, other) {
             (llvm_ir::Instruction::Add(_), llvm_ir::Instruction::Add(_))
@@ -355,6 +355,7 @@ impl crate::Instruction for llvm_ir::Instruction {
 }
 
 impl crate::Instruction for llvm_ir::Terminator {
+    const EQUIVALENT: i32 = 4;
     fn score(&self, other: &Self) -> i32 {
         match (self, other) {
             (llvm_ir::Terminator::Ret(_), llvm_ir::Terminator::Ret(_)) => 4,

@@ -42,3 +42,17 @@ The `demo` directory contains example pairs of C code.
 
 - `ll-bc`: LLVM bitcode; note that LLVM 15+ use a different pointer format that
    will trigger LLVM 14 to segfault
+- `arm64` aka `aarch64` aka `armv8`: 64-bit ARM code in a binary
+- `arm32` aka `aarch32` aka `armv7`: 32-bit ARM code in a binary
+- `avr`: ATmel AVR code in a binary; note that it cannot be in a fat MachO binary
+- `x86` aka `x86-32` aka `x86_32` aka `i386` aka `i686`: 32-bit Intel code in a binary
+- `x64` aka `x86-64` aka `x86_64`: 64-bit Intel code in a binary
+
+For all formats _in a binary_, an ELF, MachO, or PE (Windows) executable,
+library, or object file can be provided. An archive (`.a`) file containing ELF,
+MachO, or PE object files is also supported. MachO multi-architecture (aka
+_fat_) binaries are supported and only the instruction set requested will be
+used.
+
+Where appropriate, function names will go through C++ and Rust symbol
+demangling.
