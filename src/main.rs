@@ -44,9 +44,11 @@ enum FunctionName {
 }
 trait Program: Sized {
     const GAP: i32;
-    type ParseError: Display;
     type Function: Function;
-    fn parse(file: impl AsRef<Path>) -> Result<Self, Self::ParseError>;
+    type ParseError: Display;
+    type ParseOptions: Copy;
+    fn parse(file: impl AsRef<Path>, options: Self::ParseOptions)
+        -> Result<Self, Self::ParseError>;
     fn get(&self, name: &str) -> Option<&Self::Function>;
     fn functions<'a>(&'a self) -> Box<dyn Iterator<Item = (&'a str, &'a Self::Function)> + 'a>;
 }
@@ -112,30 +114,37 @@ fn main() {
 
     std::process::exit(match args.format.as_str() {
         "ll-bc" | "llbc" => {
-            show_diff::<llvm_ir::Module>(args.left_file, args.right_file, function_name)
+            show_diff::<llvm_ir::Module>(args.left_file, args.right_file, function_name, false)
         }
         "arm64" | "aarch64" | "armv8" => show_diff::<
             goblin_yax::GoblinYax<yaxpeax_arm::armv8::a64::ARMv8>,
-        >(args.left_file, args.right_file, function_name),
+        >(
+            args.left_file, args.right_file, function_name, ()
+        ),
         "arm32" | "aarch32" | "armv7" => show_diff::<
             goblin_yax::GoblinYax<yaxpeax_arm::armv8::a64::ARMv8>,
-        >(args.left_file, args.right_file, function_name),
+        >(
+            args.left_file, args.right_file, function_name, ()
+        ),
         "avr" => show_diff::<goblin_yax::GoblinYax<yaxpeax_avr::AVR>>(
             args.left_file,
             args.right_file,
             function_name,
+            (),
         ),
         "x86" | "x86-32" | "x86_32" | "i386" | "i686" => {
             show_diff::<goblin_yax::GoblinYax<yaxpeax_x86::x86_32>>(
                 args.left_file,
                 args.right_file,
                 function_name,
+                (),
             )
         }
         "x64" | "x86-64" | "x86_64" => show_diff::<goblin_yax::GoblinYax<yaxpeax_x86::x86_64>>(
             args.left_file,
             args.right_file,
             function_name,
+            (),
         ),
         fmt => {
             eprintln!("Can't parse “{}” files. Sorry.", fmt);
@@ -148,6 +157,7 @@ fn show_diff<P: Program>(
     left: impl AsRef<Path>,
     right: impl AsRef<Path>,
     name: FunctionName,
+    options: P::ParseOptions,
 ) -> i32 {
     fn find_functions<'a, T>(
         left: Option<&'a T>,
@@ -170,14 +180,14 @@ fn show_diff<P: Program>(
             }
         }
     }
-    let left = match P::parse(left) {
+    let left = match P::parse(left, options) {
         Ok(p) => p,
         Err(e) => {
             eprintln!("Failed to parse left-hand file: {}", e);
             return 3;
         }
     };
-    let right = match P::parse(right) {
+    let right = match P::parse(right, options) {
         Ok(p) => p,
         Err(e) => {
             eprintln!("Failed to parse right-hand file: {}", e);

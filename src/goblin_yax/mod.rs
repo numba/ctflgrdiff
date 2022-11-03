@@ -68,9 +68,14 @@ where
 
     type ParseError = GoblinYaxError<A>;
 
+    type ParseOptions = ();
+
     type Function = GoblinYaxFunction<A>;
 
-    fn parse(file: impl AsRef<std::path::Path>) -> Result<Self, Self::ParseError> {
+    fn parse(
+        file: impl AsRef<std::path::Path>,
+        options: Self::ParseOptions,
+    ) -> Result<Self, Self::ParseError> {
         let buffer = std::fs::read(file).map_err(GoblinYaxError::Io)?;
         fn convert<'a, A: yaxpeax_arch::Arch + MachArch, S: AsRef<str>>(
             buffer: &[u8],

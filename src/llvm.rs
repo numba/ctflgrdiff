@@ -3,11 +3,17 @@ use std::borrow::Cow;
 impl crate::Program for llvm_ir::Module {
     const GAP: i32 = 2;
 
+    type ParseOptions = bool;
+
     type ParseError = String;
 
     type Function = llvm_ir::Function;
 
-    fn parse(file: impl AsRef<std::path::Path>) -> Result<Self, Self::ParseError> {
+    fn parse(
+        file: impl AsRef<std::path::Path>,
+        options: Self::ParseOptions,
+    ) -> Result<Self, Self::ParseError> {
+        // TODO: support LL files when available
         llvm_ir::Module::from_bc_path(file)
     }
 
