@@ -42,6 +42,8 @@ The `demo` directory contains example pairs of C code.
 
 ## Supported Binary Formats
 
+- `ll-ir`: LLVM text IR; note that LLVM 15+ use a different pointer format that
+   will trigger LLVM 14 to segfault
 - `ll-bc`: LLVM bitcode; note that LLVM 15+ use a different pointer format that
    will trigger LLVM 14 to segfault
 - `arm64` aka `aarch64` aka `armv8`: 64-bit ARM code in a binary

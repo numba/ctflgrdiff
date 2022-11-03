@@ -7,7 +7,7 @@ edition = "2021"
 cpp_demangle = "^0.4"
 crossterm = "^0.25"
 goblin = "^0.6"
-llvm-ir = { version = "^0.8", features = ["llvm-14"] }
+llvm-ir = { git = "https://github.com/apmasell/llvm-ir.git", features = ["llvm-14"] }
 num-traits = "^0.2"
 rustc-demangle = "^0.1"
 yaxpeax-arch = "^0.2"

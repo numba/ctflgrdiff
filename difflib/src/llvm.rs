@@ -13,8 +13,11 @@ impl crate::Program for llvm_ir::Module {
         file: impl AsRef<std::path::Path>,
         options: Self::ParseOptions,
     ) -> Result<Self, Self::ParseError> {
-        // TODO: support LL files when available
-        llvm_ir::Module::from_bc_path(file)
+        if options {
+            llvm_ir::Module::from_ir_path(file)
+        } else {
+            llvm_ir::Module::from_bc_path(file)
+        }
     }
 
     fn get(&self, name: &str) -> Option<&Self::Function> {

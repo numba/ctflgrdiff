@@ -48,6 +48,9 @@ fn main() {
     };
 
     std::process::exit(match args.format.as_str() {
+        "ll" | "ll-ir" | "llir" => {
+            show_diff::<llvm_ir::Module>(args.left_file, args.right_file, function_name, true)
+        }
         "ll-bc" | "llbc" => {
             show_diff::<llvm_ir::Module>(args.left_file, args.right_file, function_name, false)
         }
