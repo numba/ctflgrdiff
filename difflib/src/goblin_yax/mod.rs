@@ -300,8 +300,8 @@ where
         self.funcs.get(name)
     }
 
-    fn functions<'a>(&'a self) -> Box<dyn Iterator<Item = (&'a str, &'a Self::Function)> + 'a> {
-        Box::new(self.funcs.iter().map(|(n, f)| (n.as_str(), f)))
+    fn functions<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self::Function> + 'a> {
+        Box::new(self.funcs.values())
     }
 }
 impl<A: yaxpeax_arch::Arch> crate::Function for GoblinYaxFunction<A>

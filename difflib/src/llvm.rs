@@ -21,8 +21,8 @@ impl crate::Program for llvm_ir::Module {
         self.get_func_by_name(name)
     }
 
-    fn functions<'a>(&'a self) -> Box<dyn Iterator<Item = (&'a str, &'a Self::Function)> + 'a> {
-        Box::new(self.functions.iter().map(|f| (f.name.as_str(), f)))
+    fn functions<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self::Function> + 'a> {
+        Box::new(self.functions.iter())
     }
 }
 
