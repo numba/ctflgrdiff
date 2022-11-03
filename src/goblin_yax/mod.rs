@@ -27,6 +27,7 @@ pub struct GoblinYaxFunction<A: yaxpeax_arch::Arch> {
 pub struct GoblinYaxBlock<A: yaxpeax_arch::Arch> {
     id: usize,
     instructions: Vec<A::Instruction>,
+    terminator: Option<A::Instruction>,
 }
 pub enum GoblinYaxError<A: yaxpeax_arch::Arch> {
     Fat,
@@ -94,11 +95,16 @@ where
                         Ok(inst) => {
                             addr += inst.len();
                             let new_block = inst.is_flow_control();
-                            instructions.push(inst);
                             if new_block {
                                 let id = blocks.len();
-                                blocks.push(GoblinYaxBlock { id, instructions });
+                                blocks.push(GoblinYaxBlock {
+                                    id,
+                                    instructions,
+                                    terminator: Some(inst),
+                                });
                                 instructions = Vec::new();
+                            } else {
+                                instructions.push(inst);
                             }
                         }
                         Err(e) => {
@@ -109,7 +115,11 @@ where
                 if !instructions.is_empty() {
                     // This means a chunk of assembly with no terminal flow control...
                     let id = blocks.len();
-                    blocks.push(GoblinYaxBlock { id, instructions });
+                    blocks.push(GoblinYaxBlock {
+                        id,
+                        instructions,
+                        terminator: None,
+                    });
                 }
                 Ok((name.clone(), GoblinYaxFunction::<A> { blocks, name }))
             })
@@ -309,7 +319,7 @@ where
 {
     type Instruction = A::Instruction;
 
-    type Terminator = ();
+    type Terminator = Option<A::Instruction>;
 
     fn get(&self, index: usize) -> &Self::Instruction {
         &self.instructions[index]
@@ -324,7 +334,7 @@ where
     }
 
     fn terminator(&self) -> &Self::Terminator {
-        &()
+        &self.terminator
     }
 }
 

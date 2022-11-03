@@ -78,6 +78,24 @@ impl Instruction for () {
         Cow::Borrowed("")
     }
 }
+impl<T: Instruction> Instruction for Option<T> {
+    const EQUIVALENT: i32 = T::EQUIVALENT;
+
+    fn score(&self, other: &Self) -> i32 {
+        match (self, other) {
+            (Some(left), Some(right)) => left.score(right),
+            (None, None) => T::EQUIVALENT,
+            _ => 0,
+        }
+    }
+
+    fn render<'a>(&self) -> Cow<'a, str> {
+        match self {
+            Some(inst) => inst.render(),
+            None => Cow::Borrowed("<no instruction>"),
+        }
+    }
+}
 fn main() {
     let args = Args::parse();
     let function_name = match (args.name, args.right_name) {
