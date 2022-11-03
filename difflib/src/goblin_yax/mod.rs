@@ -74,7 +74,7 @@ where
 
     fn parse(
         file: impl AsRef<std::path::Path>,
-        options: Self::ParseOptions,
+        _options: Self::ParseOptions,
     ) -> Result<Self, Self::ParseError> {
         let buffer = std::fs::read(file).map_err(GoblinYaxError::Io)?;
         fn convert<'a, A: yaxpeax_arch::Arch + MachArch, S: AsRef<str>>(

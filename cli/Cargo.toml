@@ -1,0 +1,14 @@
+[package]
+name = "ctflgrdiff"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "^4.0", features = [ "derive"] }
+crossterm = "^0.25"
+ctflgrdifflib = { path = "../difflib" }
+llvm-ir = { version = "^0.8", features = ["llvm-14"] }
+tui = "^0.19"
+yaxpeax-arm = "^0.2"
+yaxpeax-avr = "^0.1"
+yaxpeax-x86 = "^1.1"
