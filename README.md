@@ -1,7 +1,9 @@
 # ctflgrdiff
 Does side-by-side diffs of control flow graphs by comparing basic blocks in a
 way that can ignore all differences in block and value names. It only cares
-about the structure of the code when doing the comparison.
+about the structure of the code when doing the comparison. It uses an algorithm
+similar to [Needleman–Wunsch
+algorithm](https://en.wikipedia.org/wiki/Needleman%E2%80%93Wunsch_algorithm).
 
 ## Building
 You will need a Rust toolchain and LLVM 14 in order to support LLVM IR diffing.
