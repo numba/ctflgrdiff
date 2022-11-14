@@ -1,74 +1,9 @@
-use ctflgrdifflib::{goblin_yax::GoblinYax, *};
+use ctflgrdifflib::*;
 use pyo3::{
     exceptions::{PyIndexError, PyValueError},
     prelude::*,
     types::IntoPyDict,
 };
-use yaxpeax_arch::StandardDecodeError;
-use yaxpeax_arm::{
-    armv7,
-    armv8::a64::{self},
-};
-use yaxpeax_x86::long_mode;
-use yaxpeax_x86::protected_mode;
-
-trait ToPyError {
-    fn to_py_err_str(self) -> String;
-}
-
-impl ToPyError for String {
-    fn to_py_err_str(self) -> String {
-        self
-    }
-}
-impl ToPyError for a64::DecodeError {
-    fn to_py_err_str(self) -> String {
-        self.to_string()
-    }
-}
-impl ToPyError for armv7::DecodeError {
-    fn to_py_err_str(self) -> String {
-        self.to_string()
-    }
-}
-impl ToPyError for protected_mode::DecodeError {
-    fn to_py_err_str(self) -> String {
-        self.to_string()
-    }
-}
-impl ToPyError for long_mode::DecodeError {
-    fn to_py_err_str(self) -> String {
-        self.to_string()
-    }
-}
-impl ToPyError for StandardDecodeError {
-    fn to_py_err_str(self) -> String {
-        self.to_string()
-    }
-}
-impl<A: yaxpeax_arch::Arch> ToPyError for goblin_yax::GoblinYaxError<A>
-where
-    A::DecodeError: ToPyError,
-{
-    fn to_py_err_str(self) -> String {
-        format!("{}", self)
-    }
-}
-fn convert_error<P: Program>(py: Python, e: ctflgrdifflib::Error<P>) -> PyErr
-where
-    P::ParseError: ToPyError,
-{
-    match e {
-        Error::NoMatch(l) => PyErr::from_value(PyIndexError::new_err(l.name()).value(py)),
-        Error::ParseError(l, e) => {
-            let mut e = e.to_py_err_str();
-            e.push_str(" (");
-            e.push_str(l.name());
-            e.push_str(")");
-            PyErr::from_value(PyValueError::new_err(e).value(py))
-        }
-    }
-}
 
 struct PyDiff(String, String, Vec<Row>);
 type Row = (Option<&'static str>, String, String);
@@ -131,52 +66,23 @@ fn make_diff(
             (Some(v), None) => FunctionName::Same(v),
             (Some(l), Some(r)) => FunctionName::Different(l, r),
         };
-        let (has_diff, diffs): (_, Vec<PyDiff>) = match format {
-            "ll" | "ll-ir" | "llir" => {
-                compute_diff::<llvm_ir::Module, _>(left_file, right_file, function_name, true)
-                    .map_err(|e| convert_error(py, e))
-            }
-            "ll-bc" | "llbc" => {
-                compute_diff::<llvm_ir::Module, _>(left_file, right_file, function_name, false)
-                    .map_err(|e| convert_error(py, e))
-            }
-            "arm64" | "aarch64" | "armv8" => compute_diff::<
-                GoblinYax<yaxpeax_arm::armv8::a64::ARMv8>,
-                _,
-            >(left_file, right_file, function_name, ())
-            .map_err(|e| convert_error(py, e)),
-            "arm32" | "aarch32" | "armv7" => compute_diff::<
-                GoblinYax<yaxpeax_arm::armv8::a64::ARMv8>,
-                _,
-            >(left_file, right_file, function_name, ())
-            .map_err(|e| convert_error(py, e)),
-            "avr" => compute_diff::<GoblinYax<yaxpeax_avr::AVR>, _>(
-                left_file,
-                right_file,
-                function_name,
-                (),
-            )
-            .map_err(|e| convert_error(py, e)),
-            "x86" | "x86-32" | "x86_32" | "i386" | "i686" => {
-                compute_diff::<GoblinYax<yaxpeax_x86::x86_32>, _>(
-                    left_file,
-                    right_file,
-                    function_name,
-                    (),
-                )
-                .map_err(|e| convert_error(py, e))
-            }
-            "x64" | "x86-64" | "x86_64" => compute_diff::<GoblinYax<yaxpeax_x86::x86_64>, _>(
-                left_file,
-                right_file,
-                function_name,
-                (),
-            )
-            .map_err(|e| convert_error(py, e)),
-            fmt => Err(PyErr::from_value(
-                PyValueError::new_err(format!("Unsupported format {}", fmt)).value(py),
-            )),
-        }?;
+        let (has_diff, diffs) =
+            compute_diff_with_format::<PyDiff>(format, left_file, right_file, function_name)
+                .map_err(|e| match e {
+                    FormatError::BadFormat => PyErr::from_value(
+                        PyValueError::new_err(format!("Unknown assembly format {}", format))
+                            .value(py),
+                    ),
+                    FormatError::NoMatch(l) => {
+                        PyErr::from_value(PyIndexError::new_err(l.name()).value(py))
+                    }
+                    FormatError::ParseError(l, mut e) => {
+                        e.push_str(" (");
+                        e.push_str(l.name());
+                        e.push_str(")");
+                        PyErr::from_value(PyValueError::new_err(e).value(py))
+                    }
+                })?;
 
         Ok((
             has_diff,

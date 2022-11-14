@@ -1,4 +1,4 @@
-use std::{borrow::Cow, path::Path};
+use std::borrow::Cow;
 
 use clap::Parser;
 use crossterm::{
@@ -7,7 +7,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ctflgrdifflib::{
-    compute_diff, goblin_yax::GoblinYax, FunctionName, IntoDiffResult, MatchDirection, Program,
+    compute_diff_with_format, FormatError, FunctionName, IntoDiffResult, MatchDirection,
 };
 use tui::{
     backend::CrosstermBackend,
@@ -47,50 +47,118 @@ fn main() {
         }
     };
 
-    std::process::exit(match args.format.as_str() {
-        "ll" | "ll-ir" | "llir" => {
-            show_diff::<llvm_ir::Module>(args.left_file, args.right_file, function_name, true)
-        }
-        "ll-bc" | "llbc" => {
-            show_diff::<llvm_ir::Module>(args.left_file, args.right_file, function_name, false)
-        }
-        "arm64" | "aarch64" | "armv8" => show_diff::<GoblinYax<yaxpeax_arm::armv8::a64::ARMv8>>(
+    std::process::exit(
+        match compute_diff_with_format::<ConsoleOutput>(
+            args.format.as_str(),
             args.left_file,
             args.right_file,
             function_name,
-            (),
-        ),
-        "arm32" | "aarch32" | "armv7" => show_diff::<GoblinYax<yaxpeax_arm::armv8::a64::ARMv8>>(
-            args.left_file,
-            args.right_file,
-            function_name,
-            (),
-        ),
-        "avr" => show_diff::<GoblinYax<yaxpeax_avr::AVR>>(
-            args.left_file,
-            args.right_file,
-            function_name,
-            (),
-        ),
-        "x86" | "x86-32" | "x86_32" | "i386" | "i686" => {
-            show_diff::<GoblinYax<yaxpeax_x86::x86_32>>(
-                args.left_file,
-                args.right_file,
-                function_name,
-                (),
-            )
-        }
-        "x64" | "x86-64" | "x86_64" => show_diff::<GoblinYax<yaxpeax_x86::x86_64>>(
-            args.left_file,
-            args.right_file,
-            function_name,
-            (),
-        ),
-        fmt => {
-            eprintln!("Can't parse “{}” files. Sorry.", fmt);
-            2
-        }
-    });
+        ) {
+            Err(FormatError::BadFormat) => {
+                eprintln!("Can't parse “{}” files. Sorry.", args.format.as_str());
+                2
+            }
+            Err(FormatError::NoMatch(location)) => {
+                eprintln!("Cannot find function in {} file", location.name());
+                3
+            }
+            Err(FormatError::ParseError(location, e)) => {
+                eprintln!("Failed to parse {} file: {}", location.name(), e);
+                3
+            }
+            Ok((has_diff, diffs)) => {
+                if diffs.is_empty() {
+                    0
+                } else {
+                    let titles = Tabs::new(
+                        diffs
+                            .iter()
+                            .map(|output| Spans::from(vec![Span::raw(&output.0)]))
+                            .collect(),
+                    )
+                    .block(Block::default().title("Function").borders(Borders::ALL));
+                    let mut table_state = TableState::default();
+                    let mut active_tab = 0;
+                    let mut stdout = std::io::stdout();
+                    match enable_raw_mode()
+                        .and_then(|_| execute!(stdout, EnterAlternateScreen, EnableMouseCapture))
+                        .and_then(|_| Terminal::new(CrosstermBackend::new(stdout)))
+                    {
+                        Ok(mut terminal) => {
+                            loop {
+                                terminal
+                                    .draw(|rect| {
+                                        let size = rect.size();
+                                        let chunks = Layout::default()
+                                            .direction(Direction::Vertical)
+                                            .margin(2)
+                                            .constraints(
+                                                [Constraint::Length(3), Constraint::Min(20)]
+                                                    .as_ref(),
+                                            )
+                                            .split(size);
+                                        rect.render_widget(
+                                            titles.clone().select(active_tab),
+                                            chunks[0],
+                                        );
+                                        rect.render_stateful_widget(
+                                            diffs[active_tab].1.clone(),
+                                            chunks[1],
+                                            &mut table_state,
+                                        );
+                                    })
+                                    .unwrap();
+
+                                if let Event::Key(key) =
+                                    crossterm::event::read().expect("Failed to read from terminal")
+                                {
+                                    match key.code {
+                                        KeyCode::Esc | KeyCode::Char('x') | KeyCode::Char('q') => {
+                                            break
+                                        }
+                                        KeyCode::Right => {
+                                            if active_tab < diffs.len() - 1 {
+                                                active_tab += 1;
+                                                table_state.select(None);
+                                            }
+                                        }
+                                        KeyCode::Left => {
+                                            if active_tab > 0 {
+                                                active_tab -= 1;
+                                                table_state.select(None);
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                            if let Err(e) = disable_raw_mode()
+                                .and_then(|_| {
+                                    execute!(
+                                        terminal.backend_mut(),
+                                        LeaveAlternateScreen,
+                                        DisableMouseCapture
+                                    )
+                                })
+                                .and_then(|_| terminal.show_cursor())
+                            {
+                                eprintln!("Failed to reset terminal: {}", e);
+                            }
+                            if has_diff {
+                                1
+                            } else {
+                                0
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to initialize terminal: {}", e);
+                            100
+                        }
+                    }
+                }
+            }
+        },
+    );
 }
 
 struct ConsoleOutput(String, Table<'static>);
@@ -129,107 +197,5 @@ impl IntoDiffResult for ConsoleOutput {
                 .style(Style::default().fg(Color::White))
                 .highlight_symbol(">>"),
         )
-    }
-}
-
-fn show_diff<P: Program>(
-    left: impl AsRef<Path>,
-    right: impl AsRef<Path>,
-    name: FunctionName,
-    options: P::ParseOptions,
-) -> i32 {
-    match compute_diff::<P, ConsoleOutput>(left, right, name, options) {
-        Err(e) => match e {
-            ctflgrdifflib::Error::NoMatch(location) => {
-                eprintln!("Cannot find function in {} file", location.name());
-                3
-            }
-            ctflgrdifflib::Error::ParseError(location, e) => {
-                eprintln!("Failed to parse {} file: {}", location.name(), e);
-                3
-            }
-        },
-        Ok((has_diff, diffs)) => {
-            if diffs.is_empty() {
-                return 0;
-            } else {
-                let titles = Tabs::new(
-                    diffs
-                        .iter()
-                        .map(|output| Spans::from(vec![Span::raw(&output.0)]))
-                        .collect(),
-                )
-                .block(Block::default().title("Function").borders(Borders::ALL));
-                let mut table_state = TableState::default();
-                let mut active_tab = 0;
-                let mut stdout = std::io::stdout();
-                let mut terminal = match enable_raw_mode()
-                    .and_then(|_| execute!(stdout, EnterAlternateScreen, EnableMouseCapture))
-                    .and_then(|_| Terminal::new(CrosstermBackend::new(stdout)))
-                {
-                    Ok(t) => t,
-                    Err(e) => {
-                        eprintln!("Failed to initialize terminal: {}", e);
-                        return 100;
-                    }
-                };
-                loop {
-                    terminal
-                        .draw(|rect| {
-                            let size = rect.size();
-                            let chunks = Layout::default()
-                                .direction(Direction::Vertical)
-                                .margin(2)
-                                .constraints([Constraint::Length(3), Constraint::Min(20)].as_ref())
-                                .split(size);
-                            rect.render_widget(titles.clone().select(active_tab), chunks[0]);
-                            rect.render_stateful_widget(
-                                diffs[active_tab].1.clone(),
-                                chunks[1],
-                                &mut table_state,
-                            );
-                        })
-                        .unwrap();
-
-                    if let Event::Key(key) =
-                        crossterm::event::read().expect("Failed to read from terminal")
-                    {
-                        match key.code {
-                            KeyCode::Esc | KeyCode::Char('x') | KeyCode::Char('q') => break,
-                            KeyCode::Right => {
-                                if active_tab < diffs.len() - 1 {
-                                    active_tab += 1;
-                                    table_state.select(None);
-                                }
-                            }
-                            KeyCode::Left => {
-                                if active_tab > 0 {
-                                    active_tab -= 1;
-                                    table_state.select(None);
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                if let Err(e) = disable_raw_mode()
-                    .and_then(|_| {
-                        execute!(
-                            terminal.backend_mut(),
-                            LeaveAlternateScreen,
-                            DisableMouseCapture
-                        )
-                    })
-                    .and_then(|_| terminal.show_cursor())
-                {
-                    eprintln!("Failed to reset terminal: {}", e);
-                }
-                if has_diff {
-                    1
-                } else {
-                    0
-                }
-            }
-        }
     }
 }

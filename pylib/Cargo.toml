@@ -11,9 +11,4 @@ crate-type = ["cdylib"]
 [dependencies]
 
 ctflgrdifflib = { path = "../difflib" }
-llvm-ir = { git = "https://github.com/apmasell/llvm-ir.git", features = ["llvm-14"] }
 pyo3 = { version = "0.17.1", features = ["extension-module"] }
-yaxpeax-arch = "^0.2"
-yaxpeax-arm = "^0.2"
-yaxpeax-avr = "^0.1"
-yaxpeax-x86 = "^1.1"

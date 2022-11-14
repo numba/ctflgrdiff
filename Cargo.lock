@@ -167,11 +167,7 @@ dependencies = [
  "clap",
  "crossterm 0.25.0",
  "ctflgrdifflib",
- "llvm-ir",
  "tui",
- "yaxpeax-arm",
- "yaxpeax-avr",
- "yaxpeax-x86",
 ]
 
 [[package]]
@@ -468,12 +464,7 @@ name = "pyctflgrdiff"
 version = "0.1.0"
 dependencies = [
  "ctflgrdifflib",
- "llvm-ir",
  "pyo3",
- "yaxpeax-arch",
- "yaxpeax-arm",
- "yaxpeax-avr",
- "yaxpeax-x86",
 ]
 
 [[package]]

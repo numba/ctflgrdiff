@@ -167,11 +167,29 @@ pub enum MatchDirection {
 }
 
 /// An error produced by the diff process
-pub enum Error<P: Program> {
+pub enum Error<E> {
     /// Functions could not be located from the input programs
     NoMatch(FunctionLocation),
     /// The input file could not be parsed
-    ParseError(FunctionLocation, P::ParseError),
+    ParseError(FunctionLocation, E),
+}
+
+pub enum FormatError {
+    /// Functions could not be located from the input programs
+    NoMatch(FunctionLocation),
+    /// The input file could not be parsed
+    ParseError(FunctionLocation, String),
+    /// The assembly format is not recognized
+    BadFormat,
+}
+
+impl<E: Display> From<Error<E>> for FormatError {
+    fn from(input: Error<E>) -> Self {
+        match input {
+            Error::NoMatch(l) => FormatError::NoMatch(l),
+            Error::ParseError(l, e) => FormatError::ParseError(l, format!("{}", e)),
+        }
+    }
 }
 
 /// Parse and compare two programs
@@ -180,11 +198,11 @@ pub fn compute_diff<P: Program, D: IntoDiffResult>(
     right: impl AsRef<Path>,
     name: FunctionName,
     options: P::ParseOptions,
-) -> Result<(bool, Vec<D>), Error<P>> {
+) -> Result<(bool, Vec<D>), Error<P::ParseError>> {
     fn find_functions<'a, T, P: Program>(
         left: Option<&'a T>,
         right: Option<&'a T>,
-    ) -> Result<Box<dyn Iterator<Item = (&'a T, &'a T)> + 'a>, Error<P>> {
+    ) -> Result<Box<dyn Iterator<Item = (&'a T, &'a T)> + 'a>, Error<P::ParseError>> {
         match (left, right) {
             (Some(left), Some(right)) => Ok(Box::new(std::iter::once((left, right)))),
             (None, Some(_)) => Err(Error::NoMatch(FunctionLocation::Left)),
@@ -198,10 +216,10 @@ pub fn compute_diff<P: Program, D: IntoDiffResult>(
         P::parse(right, options).map_err(|e| Error::ParseError(FunctionLocation::Right, e))?;
     let pairs = match name {
         FunctionName::Different(left_name, right_name) => {
-            find_functions(left.get(left_name.as_str()), right.get(right_name.as_str()))?
+            find_functions::<_, P>(left.get(left_name.as_str()), right.get(right_name.as_str()))?
         }
         FunctionName::Same(name) => {
-            find_functions(left.get(name.as_str()), right.get(name.as_str()))?
+            find_functions::<_, P>(left.get(name.as_str()), right.get(name.as_str()))?
         }
         FunctionName::Unspecified => {
             let right: BTreeMap<_, _> = right.functions().map(|func| (func.name(), func)).collect();
@@ -376,4 +394,56 @@ pub fn compute_diff<P: Program, D: IntoDiffResult>(
         diffs.push(D::function(left_func.name(), right_func.name(), table));
     }
     Ok((has_diff, diffs))
+}
+
+pub fn compute_diff_with_format<D: IntoDiffResult>(
+    format: &str,
+    left_file: impl AsRef<Path>,
+    right_file: impl AsRef<Path>,
+    function_name: FunctionName,
+) -> Result<(bool, Vec<D>), FormatError> {
+    match format {
+        "ll" | "ll-ir" | "llir" => {
+            compute_diff::<llvm_ir::Module, _>(left_file, right_file, function_name, true)
+                .map_err(|e| e.into())
+        }
+        "ll-bc" | "llbc" => {
+            compute_diff::<llvm_ir::Module, _>(left_file, right_file, function_name, false)
+                .map_err(|e| e.into())
+        }
+        "arm64" | "aarch64" | "armv8" => compute_diff::<
+            goblin_yax::GoblinYax<yaxpeax_arm::armv8::a64::ARMv8>,
+            _,
+        >(left_file, right_file, function_name, ())
+        .map_err(|e| e.into()),
+        "arm32" | "aarch32" | "armv7" => compute_diff::<
+            goblin_yax::GoblinYax<yaxpeax_arm::armv8::a64::ARMv8>,
+            _,
+        >(left_file, right_file, function_name, ())
+        .map_err(|e| e.into()),
+        "avr" => compute_diff::<goblin_yax::GoblinYax<yaxpeax_avr::AVR>, _>(
+            left_file,
+            right_file,
+            function_name,
+            (),
+        )
+        .map_err(|e| e.into()),
+        "x86" | "x86-32" | "x86_32" | "i386" | "i686" => compute_diff::<
+            goblin_yax::GoblinYax<yaxpeax_x86::x86_32>,
+            _,
+        >(
+            left_file, right_file, function_name, ()
+        )
+        .map_err(|e| e.into()),
+        "x64" | "x86-64" | "x86_64" => {
+            compute_diff::<goblin_yax::GoblinYax<yaxpeax_x86::x86_64>, _>(
+                left_file,
+                right_file,
+                function_name,
+                (),
+            )
+            .map_err(|e| e.into())
+        }
+        _ => Err(FormatError::BadFormat),
+    }
 }
