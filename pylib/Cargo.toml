@@ -1,0 +1,19 @@
+[package]
+name = "pyctflgrdiff"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "pyctflgrdiff"
+crate-type = ["cdylib"]
+
+[dependencies]
+
+ctflgrdifflib = { path = "../difflib" }
+llvm-ir = { git = "https://github.com/apmasell/llvm-ir.git", features = ["llvm-14"] }
+pyo3 = { version = "0.17.1", features = ["extension-module"] }
+yaxpeax-arch = "^0.2"
+yaxpeax-arm = "^0.2"
+yaxpeax-avr = "^0.1"
+yaxpeax-x86 = "^1.1"

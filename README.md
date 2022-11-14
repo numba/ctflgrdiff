@@ -13,6 +13,14 @@ To build:
 cargo build
 ```
 
+This can also build a Python module. To do that:
+
+```
+pip install maturin
+cd pylib
+maturin build
+```
+
 ## Usage
 First, create the two files you wish to diff:
 
