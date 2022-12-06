@@ -86,6 +86,7 @@ fn main() {
                     {
                         Ok(mut terminal) => {
                             loop {
+                                let mut page = 10;
                                 terminal
                                     .draw(|rect| {
                                         let size = rect.size();
@@ -97,6 +98,7 @@ fn main() {
                                                     .as_ref(),
                                             )
                                             .split(size);
+                                        page = chunks[1].height;
                                         rect.render_widget(
                                             titles.clone().select(active_tab),
                                             chunks[0],
@@ -119,14 +121,46 @@ fn main() {
                                         KeyCode::Right => {
                                             if active_tab < diffs.len() - 1 {
                                                 active_tab += 1;
-                                                table_state.select(None);
+                                                table_state.select(Some(0));
                                             }
                                         }
                                         KeyCode::Left => {
                                             if active_tab > 0 {
                                                 active_tab -= 1;
-                                                table_state.select(None);
+                                                table_state.select(Some(0));
                                             }
+                                        }
+                                        KeyCode::Down => {
+                                            table_state.select(Some(
+                                                table_state
+                                                    .selected()
+                                                    .unwrap_or(0)
+                                                    .saturating_add(1),
+                                            ));
+                                        }
+                                        KeyCode::Up => {
+                                            table_state.select(Some(
+                                                table_state
+                                                    .selected()
+                                                    .unwrap_or(0)
+                                                    .saturating_sub(1),
+                                            ));
+                                        }
+                                        KeyCode::PageDown => {
+                                            table_state.select(Some(
+                                                table_state
+                                                    .selected()
+                                                    .unwrap_or(0)
+                                                    .saturating_add(page as usize),
+                                            ));
+                                        }
+                                        KeyCode::PageUp => {
+                                            table_state.select(Some(
+                                                table_state
+                                                    .selected()
+                                                    .unwrap_or(0)
+                                                    .saturating_sub(page as usize),
+                                            ));
                                         }
                                         _ => {}
                                     }
